@@ -91,7 +91,7 @@ fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales,
 ```{r}
 library(ggplot2)
 
-ggplot(sales , aes(x = Approved_Conversion, y = Impressions, size = Clicks, color = interest)) + 
+ggplot(sales , aes(x = interest, y = Clicks, size = Clicks, color = interest)) + 
  # geom_boxplot() +
   geom_jitter(width = 0.25,show.legend = FALSE, fill = "white") + 
   geom_smooth(method = 'lm', formula = y~x)

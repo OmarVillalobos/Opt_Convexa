@@ -18,7 +18,7 @@ d
 ```
 
 ```{r}
-fit <- brm(sold ~ scratched + year + price, data = d, family = bernoulli(link = "logit"), 
+fit <- brm(sold ~ scratched + year + price, data = d, family = bernoulli(link = "logit"),
            prior = c(set_prior("normal(-1,1)", class="b", coef="scratched"), 
                      set_prior("normal(1, 1)", class="b", coef="year"), 
                      set_prior("normal(-2, 1)", class="b", coef="price")), 
