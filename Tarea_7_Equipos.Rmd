@@ -10,16 +10,16 @@ library(brms)
 ```
 
 ```{r}
-d <- read_csv('~/Downloads/heart-2.csv')
+d <- read_csv('~/GitHub/OptConvexa/heart-2.csv')
 d <- d[,c("sex","chol","thalach","target")]
 d$target <- as.factor(d$target)
 ```
 
 ```{r}
-mean(d$chol)
-d$target_mario <- rep(0,303)
-d$target_mario[mean(d$chol) < d$chol] <- 1
-head(d)
+# mean(d$chol)
+# d$target_mario <- rep(0,303)
+# d$target_mario[mean(d$chol) < d$chol] <- 1
+# head(d)
 ```
 ```{r}
 library(ggplot2)
@@ -44,59 +44,87 @@ fit <- brm(target ~ sex + chol +  thalach ,data = d, family = bernoulli(link = "
 ```{r}
 salud <- function(dat){
   # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
-  our.phone <- data.frame(sex=0, thalach=, chol=dat[1]) 
+  our.phone <- data.frame(sex=0, thalach=120, chol=dat[1]) 
   
   # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
   pp <- posterior_predict(fit, newdata=our.phone)
   
   # Next calculate the expected return for each of these posterior simulations
-  mean(pp*dat[1]*dat[2])
+  mean(pp*dat[1])
 }
-(op <- optim(c(250,100), function(x) salud(x)))
+(op <- optimize(250, function(x) salud(x)))
 ```
 
 ```{r}
-x <- c(100:600, 100:160) # Listing prices to evaluate
+optimize(function(x) salud(x), c(100,600), maximum = TRUE)
+```
+
+
+```{r}
+x <- seq(1,600,by = 10) # Listing prices to evaluate
 l <- sapply(x, salud) 
-#plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
+plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
 ```
 
 
 
-# Source Suggestion
+# Sales Convertion
 
 ```{r}
-d <- data.frame(B = c(1, 0, 1, 0, 1, 1), 
-           len = c(15, 100, 25, 130, 10, 26), 
-           similitud = c(0.97, 0.1, 0.95, 0.05, 0.91, 0.8))
-d
+sales <- read_csv('~/GitHub/OptConvexa/KAG_conversion_data.csv')
+sales$Approved_Conversion[sales$Approved_Conversion == 0] <- -1
+sales$Approved_Conversion[sales$Approved_Conversion >= 1] <- 1
+sales$xyz_campaign_id <- as.factor(sales$xyz_campaign_id)
+sales <- sales[sales$xyz_campaign_id == 1178,]
 
-fit <- brm(B ~ len + similitud +  costo ,data = d, family = bernoulli(link = "logit"), 
-           prior = c(set_prior("normal(-1,1)", class="b", coef="len"), 
-                     set_prior("normal(1, 1)", class="b", coef="similitud"),
-                     set_prior("normal(-2,1)", class="b", coef="costo")), 
+sales$age <- as.factor(sales$age)
+sales$gender <- as.factor(sales$gender)
+sales$Approved_Conversion <- as.factor(sales$Approved_Conversion)
+
+
+fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = gaussian(link = "log"), 
+           prior = get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli()), 
            silent=TRUE, 
            refresh = -1)
 ```
 
 ```{r}
-loss <- function(len){
+library(ggplot2)
+
+ggplot(sales , aes(x = Approved_Conversion, y = Impressions, size = Clicks, color = interest)) + 
+ # geom_boxplot() +
+  geom_jitter(width = 0.25,show.legend = FALSE, fill = "white") + 
+  geom_smooth(method = 'lm', formula = y~x)
+```
+
+
+```{r}
+library(stats)
+test_glm <- glm(Approved_Conversion ~ age + Clicks + interest + Spent , data = sales, family = binomial(link = "logit"))
+predict.glm(test_glm, newdata = data.frame(age = '30-34', Clicks = 2, interest=32, Spent = 1.1), type = 'response')
+```
+
+
+```{r}
+add_spend <- function(spend){
   # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
-  our.phone <- data.frame(len=len, similitud=0.40, costo=50) 
+
+  our.phone <- data.frame(age = '30-34', gender='M', interest=5, Spent = spend) 
   
   # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
   pp <- posterior_predict(fit, newdata=our.phone)
   
   # Next calculate the expected return for each of these posterior simulations
-  mean(pp*len)
+  mean(pp*spend)
 }
-(op <- optim(20, function(x) -loss(x)))
+optimize(function(x) add_spend(x), c(-6000,6000), maximum = FALSE)
+#(op <- optim(20, function(x) -add_spend(x)))
 ```
 
 
 ```{r}
-x <- 10:180 # Listing prices to evaluate
-l <- sapply(x, loss) 
+x <- seq(-6000,10000, by=100) # Listing prices to evaluate
+l <- sapply(x, add_spend) 
 plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
 ```
 
