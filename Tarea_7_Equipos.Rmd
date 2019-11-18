@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Heart Decease
+
+```{r}
+library(tidyverse)
+library(brms)
+```
+
+```{r}
+d <- read_csv('~/Downloads/heart-2.csv')
+d <- d[,c("sex","chol","thalach","target")]
+d$target <- as.factor(d$target)
+```
+
+```{r}
+mean(d$chol)
+d$target_mario <- rep(0,303)
+d$target_mario[mean(d$chol) < d$chol] <- 1
+head(d)
+```
+```{r}
+library(ggplot2)
+
+ggplot(d , aes(x = target, y = chol)) + geom_boxplot()
+```
+
+
+
+
+```{r}
+fit <- brm(target ~ sex + chol +  thalach ,data = d, family = bernoulli(link = "logit"), 
+           prior = c(set_prior("normal(-1,1)", class="b", coef="sex"), 
+                     set_prior("normal(1, 1)", class="b", coef="chol"),
+                     set_prior("normal(-2,1)", class="b", coef="thalach")), 
+           silent=TRUE, 
+           refresh = -1)
+```
+
+
+
+```{r}
+salud <- function(dat){
+  # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
+  our.phone <- data.frame(sex=0, thalach=, chol=dat[1]) 
+  
+  # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
+  pp <- posterior_predict(fit, newdata=our.phone)
+  
+  # Next calculate the expected return for each of these posterior simulations
+  mean(pp*dat[1]*dat[2])
+}
+(op <- optim(c(250,100), function(x) salud(x)))
+```
+
+```{r}
+x <- c(100:600, 100:160) # Listing prices to evaluate
+l <- sapply(x, salud) 
+#plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
+```
+
+
+
+# Source Suggestion
+
+```{r}
+d <- data.frame(B = c(1, 0, 1, 0, 1, 1), 
+           len = c(15, 100, 25, 130, 10, 26), 
+           similitud = c(0.97, 0.1, 0.95, 0.05, 0.91, 0.8))
+d
+
+fit <- brm(B ~ len + similitud +  costo ,data = d, family = bernoulli(link = "logit"), 
+           prior = c(set_prior("normal(-1,1)", class="b", coef="len"), 
+                     set_prior("normal(1, 1)", class="b", coef="similitud"),
+                     set_prior("normal(-2,1)", class="b", coef="costo")), 
+           silent=TRUE, 
+           refresh = -1)
+```
+
+```{r}
+loss <- function(len){
+  # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
+  our.phone <- data.frame(len=len, similitud=0.40, costo=50) 
+  
+  # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
+  pp <- posterior_predict(fit, newdata=our.phone)
+  
+  # Next calculate the expected return for each of these posterior simulations
+  mean(pp*len)
+}
+(op <- optim(20, function(x) -loss(x)))
+```
+
+
+```{r}
+x <- 10:180 # Listing prices to evaluate
+l <- sapply(x, loss) 
+plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
+```
+
+
+
+#
