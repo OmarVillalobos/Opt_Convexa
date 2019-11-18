@@ -94,7 +94,8 @@ library(ggplot2)
 ggplot(sales , aes(x = interest, y = Clicks, size = Clicks, color = interest)) + 
  # geom_boxplot() +
   geom_jitter(width = 0.25,show.legend = FALSE, fill = "white") + 
-  geom_smooth(method = 'lm', formula = y~x)
+  geom_smooth(method = 'lm', formula = y~x) + 
+  facet_grid()
 ```
 
 
