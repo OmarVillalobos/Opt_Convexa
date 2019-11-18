@@ -71,7 +71,7 @@ plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
 # Sales Convertion
 
 ```{r}
-sales <- read_csv('~/GitHub/OptConvexa/KAG_conversion_data.csv')
+sales <- read_csv('/Users/omar/Documents/Python/Maestria/Opt Convexa/Git/KAG_conversion_data.csv')
 sales$Approved_Conversion[sales$Approved_Conversion == 0] <- -1
 sales$Approved_Conversion[sales$Approved_Conversion >= 1] <- 1
 sales$xyz_campaign_id <- as.factor(sales$xyz_campaign_id)
@@ -82,10 +82,20 @@ sales$gender <- as.factor(sales$gender)
 sales$Approved_Conversion <- as.factor(sales$Approved_Conversion)
 
 
-fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = gaussian(link = "log"), 
-           prior = get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli()), 
+fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli(link = "logit"), 
+           prior = get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson()), 
            silent=TRUE, 
            refresh = -1)
+
+fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli(link = "logit"), 
+           prior = c(empty_prior(), 
+                     empty_prior(),
+                     set_prior("normal(-2,1)", class="b", coef="interest"),
+                     set_prior("normal(-1,1)", class="b", coef="Spent")), 
+           silent=TRUE, 
+           refresh = -1)
+prior <- get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson())
+make_stancode(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson(), prior = prior)
 ```
 
 ```{r}
@@ -110,7 +120,7 @@ predict.glm(test_glm, newdata = data.frame(age = '30-34', Clicks = 2, interest=3
 add_spend <- function(spend){
   # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
 
-  our.phone <- data.frame(age = '30-34', gender='M', interest=5, Spent = spend) 
+  our.phone <- data.frame(age = '30-34', gender='M', interest=32, Spent = spend) 
   
   # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
   pp <- posterior_predict(fit, newdata=our.phone)
@@ -118,7 +128,7 @@ add_spend <- function(spend){
   # Next calculate the expected return for each of these posterior simulations
   mean(pp*spend)
 }
-optimize(function(x) add_spend(x), c(-6000,6000), maximum = FALSE)
+optimize(function(x) add_spend(x), c(-6000,6000), maximum = TRUE)
 #(op <- optim(20, function(x) -add_spend(x)))
 ```
 
