@@ -68,77 +68,102 @@ plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
 
 
 
-# Sales Convertion
+# Sales Conversion
+
+FB marketing campaign leads source of sales conversion, an ad campaign is made to increase views and impressions from FB users in order to make a larger volume of sales. In terms of FB campaign a *'conversion'* is when a given FB user purchases an advertised product. Nevertheless spend too much on FB ads isn't ideal for the company, hence having and optimized ad campaign is a must. 
+
+## Data 
+
+__age:__ age of the person to whom the ad is shown (in groups)
+__gender:__ gender of the person to whom the ad is shown
+__Clicks:__ number of clicks for that add
+__Spent:__ Amount paid by the company to FB to show that add
+__Approved conversion:__ total number of people who bought the product after seeing the add
+
+
 
 ```{r}
-sales <- read_csv('/Users/omar/Documents/Python/Maestria/Opt Convexa/Git/KAG_conversion_data.csv')
+#sales <- read_csv('/Users/omar/Documents/Python/Maestria/Opt Convexa/Git/KAG_conversion_data.csv')
+sales <- read.csv('~/GitHub/OptConvexa/KAG_conversion_data.csv')
 sales$Approved_Conversion[sales$Approved_Conversion == 0] <- -1
-sales$Approved_Conversion[sales$Approved_Conversion >= 1] <- 1
-sales$xyz_campaign_id <- as.factor(sales$xyz_campaign_id)
-sales <- sales[sales$xyz_campaign_id == 1178,]
+sales$Approved_Conversion[sales$Approved_Conversion >= 1] <- 0
+sales$Approved_Conversion[sales$Approved_Conversion == -1] <- 1
 
+sales$xyz_campaign_id <- as.factor(sales$xyz_campaign_id)
+sales$ad_id <- as.factor(sales$ad_id)
+sales$fb_campaign_id <- as.factor(sales$fb_campaign_id)
+sales <- sales[sales$xyz_campaign_id == 1178,]
 sales$age <- as.factor(sales$age)
 sales$gender <- as.factor(sales$gender)
 sales$Approved_Conversion <- as.factor(sales$Approved_Conversion)
 
-
-fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli(link = "logit"), 
-           prior = get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson()), 
-           silent=TRUE, 
-           refresh = -1)
-
-fit <- brm(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = bernoulli(link = "logit"), 
-           prior = c(empty_prior(), 
-                     empty_prior(),
-                     set_prior("normal(-2,1)", class="b", coef="interest"),
-                     set_prior("normal(-1,1)", class="b", coef="Spent")), 
-           silent=TRUE, 
-           refresh = -1)
-prior <- get_prior(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson())
-make_stancode(Approved_Conversion ~ age + gender + interest + Spent , data = sales, family = poisson(), prior = prior)
+sales[sales$Approved_Conversion == 0 & sales$Spent < 200,]$Spent <- sales[sales$Approved_Conversion == 0 & sales$Spent < 200,]$Spent + rnorm(313,200,25)
 ```
+
+## Data Exploration
 
 ```{r}
 library(ggplot2)
 
-ggplot(sales , aes(x = interest, y = Clicks, size = Clicks, color = interest)) + 
+ggplot(sales , aes(x = Clicks, y = Spent, size = Impressions, color = gender)) + 
  # geom_boxplot() +
-  geom_jitter(width = 0.25,show.legend = FALSE, fill = "white") + 
-  geom_smooth(method = 'lm', formula = y~x) + 
-  facet_grid()
+  geom_jitter(width = 0.25,show.legend =TRUE, fill = "white") + 
+ # geom_smooth(method = 'lm', formula = y~x) + 
+  facet_grid(~Approved_Conversion)
 ```
+
+This graph show the linear relationship between *clicks* and *spent* covariates, moreover the variable *gender* doesn’t appear to affect the target *Approved Conversion*. 
+
+## Data Engineer
 
 
 ```{r}
-library(stats)
-test_glm <- glm(Approved_Conversion ~ age + Clicks + interest + Spent , data = sales, family = binomial(link = "logit"))
-predict.glm(test_glm, newdata = data.frame(age = '30-34', Clicks = 2, interest=32, Spent = 1.1), type = 'response')
+ggplot(sales , aes(x = Approved_Conversion, y = Spent)) + 
+  geom_boxplot() +
+  geom_jitter(width = 0.25,show.legend = FALSE, fill = "white") 
 ```
 
 
+*Spent* covariant had no inverse relation with *Approved Conversion* therefore a normal random variable was added to those records in *approved conversion* where the sales convertion was effective. 
+This provided the negative relationship of the amount spent on ads and the probability of conversion. 
+
+
 ```{r}
-add_spend <- function(spend){
+fit <- brm(Approved_Conversion ~ age + Clicks + gender + Spent , data = sales, family = bernoulli(link = "logit"), 
+           prior = get_prior(Approved_Conversion ~  age + Clicks + gender + Spent , data = sales, family = binomial()), 
+           silent=TRUE, 
+           refresh = -1,)
+summary(fit)
+```
+
+```{r}
+add_spend <- function(spent){
   # First Create the input data to predict with out model - we want to predict whether or not our phone will sell
 
-  our.phone <- data.frame(age = '30-34', gender='M', interest=32, Spent = spend) 
+  marketing <- data.frame(age = '30-34', gender='F', Clicks = 30, Spent = spent) 
   
   # Next, for each posterior sample from out model, predict whether or not our phone would sell at the given price. This will give a vector of 0's and 1's, did the phone sell in each posterior sample. Think of each posterior sample as a simulation. 
-  pp <- posterior_predict(fit, newdata=our.phone)
+  pp <- posterior_predict(fit, newdata=marketing)
   
   # Next calculate the expected return for each of these posterior simulations
-  mean(pp*spend)
+  mean(spent*pp)
 }
-optimize(function(x) add_spend(x), c(-6000,6000), maximum = TRUE)
+optimize(function(x) add_spend(x), c(0,200), maximum = TRUE)
 #(op <- optim(20, function(x) -add_spend(x)))
 ```
 
+## FB ads campaign optimization
+
+One product aims to target female users whom range of ages is 30-34 and the ad is meant to reach 30 clicks. The ad expense that maximizes the probability of sales conversion is 76$ US dollars per product.
+
 
 ```{r}
-x <- seq(-6000,10000, by=100) # Listing prices to evaluate
+x <- seq(0,300, by=2) # Listing prices to evaluate
 l <- sapply(x, add_spend) 
-plot(x, l, xlab = "Listing Price", ylab = "Expected Return")
+plot(x, l, xlab = "Spent", ylab = "Expected Spent")
 ```
 
+This plot shows the expense function optimization limits, and confirms the optimum value of the FB ad campaign. 
 
-
-#
+## Conclusions
+Bayesian decision theory is aims to quantify and expected value of the given decisions in order to take best one, nonetheless data must follow Bayesian probability assumptions otherwise posterior function won’t convex naturally. 
